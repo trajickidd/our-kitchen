@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: our-kitchen-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: FLASK_DEBUG
+        value: false
+    disk:
+      name: our-kitchen-data
+      mountPath: /data
+      sizeGB: 1
+
+  - type: web
+    name: our-kitchen
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://our-kitchen-api.onrender.com/api/*
+      - type: rewrite
+        source: /*
+        destination: /index.html
