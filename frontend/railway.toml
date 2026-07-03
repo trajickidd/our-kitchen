@@ -4,3 +4,6 @@ buildCommand = "npm install && npm run build"
 
 [deploy]
 startCommand = "npx serve dist -p $PORT"
+
+[variables]
+NIXPACKS_NODE_VERSION = "20"
