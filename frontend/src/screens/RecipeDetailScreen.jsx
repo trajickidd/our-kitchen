@@ -59,7 +59,7 @@ export default function RecipeDetailScreen({ showToast }) {
 
   const toggleFavourite = async () => {
     try {
-      const r = await api.post(\`/recipes/\${id}/favourite\`)
+      const r = await api.post(`/recipes/${id}/favourite`)
       setIsFavourite(r.data.is_favourite)
     } catch (e) {}
   }
