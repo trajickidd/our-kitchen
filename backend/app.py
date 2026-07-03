@@ -90,6 +90,7 @@ class Recipe(db.Model):
     base_portions = db.Column(db.Integer, default=4)
     tags = db.Column(db.JSON, default=list)
     notes = db.Column(db.Text)
+    is_favourite = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     ingredients = db.relationship('RecipeIngredient', backref='recipe', lazy=True, cascade='all, delete-orphan')
@@ -108,6 +109,7 @@ class Recipe(db.Model):
             'base_portions': self.base_portions,
             'tags': self.tags or [],
             'notes': self.notes,
+            'is_favourite': self.is_favourite or False,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -753,6 +755,82 @@ Return JSON with:
         return jsonify({'claude': result, 'source_type': 'voice'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# ─── Favourite toggle ─────────────────────────────────────────────────────────
+
+@app.route('/api/recipes/<int:rid>/favourite', methods=['POST'])
+def toggle_favourite(rid):
+    recipe = Recipe.query.get_or_404(rid)
+    recipe.is_favourite = not (recipe.is_favourite or False)
+    db.session.commit()
+    return jsonify({'is_favourite': recipe.is_favourite})
+
+# ─── Parse raw ingredient strings ─────────────────────────────────────────────
+
+@app.route('/api/parse-ingredients', methods=['POST'])
+def parse_ingredients():
+    import re
+    raw_list = request.json.get('ingredients', [])
+    UNITS = ['g', 'kg', 'ml', 'l', 'tsp', 'tbsp', 'cup', 'cups', 'oz', 'lb',
+             'tablespoon', 'tablespoons', 'teaspoon', 'teaspoons', 'litre', 'litres',
+             'liter', 'liters', 'gram', 'grams', 'kilogram', 'kilograms',
+             'milliliter', 'milliliters', 'ounce', 'ounces', 'pound', 'pounds',
+             'handful', 'handfuls', 'bunch', 'pinch', 'clove', 'cloves', 'slice', 'slices',
+             'can', 'cans', 'tin', 'tins', 'jar', 'jars', 'piece', 'pieces']
+    UNIT_MAP = {
+        'tablespoon': 'tbsp', 'tablespoons': 'tbsp', 'teaspoon': 'tsp', 'teaspoons': 'tsp',
+        'cups': 'cup', 'litre': 'l', 'litres': 'l', 'liter': 'l', 'liters': 'l',
+        'gram': 'g', 'grams': 'g', 'kilogram': 'kg', 'kilograms': 'kg',
+        'milliliter': 'ml', 'milliliters': 'ml', 'ounce': 'oz', 'ounces': 'oz',
+        'pound': 'lb', 'pounds': 'lb', 'cloves': 'whole', 'clove': 'whole',
+        'handful': 'whole', 'handfuls': 'whole', 'bunch': 'whole', 'pinch': 'pinch',
+        'slice': 'whole', 'slices': 'whole', 'can': 'whole', 'cans': 'whole',
+        'tin': 'whole', 'tins': 'whole', 'jar': 'whole', 'jars': 'whole',
+        'piece': 'whole', 'pieces': 'whole',
+    }
+    parsed = []
+    for raw in raw_list:
+        if not raw or not raw.strip():
+            continue
+        text = raw.strip()
+        # Remove parenthetical notes
+        text = re.sub(r'\([^)]*\)', '', text).strip()
+        qty = 0
+        unit = 'whole'
+        name = text
+        # Match number (including fractions like 1/2)
+        m = re.match(r'^(\d+(?:[\./]\d+)?(?:\s+\d+/\d+)?)\s*(.*)', text)
+        if m:
+            qty_str = m.group(1).strip()
+            remainder = m.group(2).strip()
+            # Handle fractions
+            if '/' in qty_str:
+                parts = qty_str.split('/')
+                try:
+                    qty = float(parts[0]) / float(parts[1])
+                except:
+                    qty = 0
+            else:
+                try:
+                    qty = float(qty_str.replace(' ', '.'))
+                except:
+                    qty = 0
+            # Check for unit
+            unit_match = re.match(r'^(' + '|'.join(UNITS) + r')s?\s*(.*)', remainder, re.IGNORECASE)
+            if unit_match:
+                raw_unit = unit_match.group(1).lower()
+                unit = UNIT_MAP.get(raw_unit, raw_unit)
+                name = unit_match.group(2).strip()
+            else:
+                name = remainder
+        if not name:
+            name = text
+        # Clean up name
+        name = re.sub(r'^(of |the |a |an )', '', name, flags=re.IGNORECASE).strip()
+        name = name.rstrip(',').strip()
+        if name:
+            parsed.append({'name': name, 'quantity': round(qty, 2), 'unit': unit})
+    return jsonify(parsed)
 
 # ─── Health ────────────────────────────────────────────────────────────────────
 

@@ -203,6 +203,19 @@ function VoiceImporter({ onResult, showToast }) {
 
 function RecipeEditor({ data, sourceUrl, sourceType, onSave, showToast }) {
   const d = data?.claude || data?.scraped || {}
+  const scraped = data?.scraped || {}
+
+  const initIngredients = () => {
+    if (d.ingredients && d.ingredients.length) return d.ingredients.map((i, idx) => ({ ...i, _key: idx }))
+    const raw = scraped.ingredients_raw || []
+    return raw.map((str, idx) => ({ _key: idx, name: str, quantity: 0, unit: 'g' }))
+  }
+
+  const initMethod = () => {
+    if (d.method && d.method.length) return d.method.join('\n')
+    if (scraped.method_raw && scraped.method_raw.length) return scraped.method_raw.join('\n')
+    return ''
+  }
   const [title, setTitle] = useState(d.title || '')
   const [description, setDescription] = useState(d.description || '')
   const [cuisine, setCuisine] = useState(d.cuisine || '')
@@ -210,8 +223,8 @@ function RecipeEditor({ data, sourceUrl, sourceType, onSave, showToast }) {
   const [cookTime, setCookTime] = useState(d.cook_time_mins || '')
   const [portions, setPortions] = useState(d.base_portions || 4)
   const [tags, setTags] = useState(d.tags || [])
-  const [ingredients, setIngredients] = useState((d.ingredients || []).map((i, idx) => ({ ...i, _key: idx })))
-  const [method, setMethod] = useState((d.method || []).join('\n'))
+  const [ingredients, setIngredients] = useState(initIngredients)
+  const [method, setMethod] = useState(initMethod)
   const [saving, setSaving] = useState(false)
   const navigate = useNavigate()
   const imageUrl = data?.scraped?.image_url || data?.tiktok?.thumbnail || data?.thumbnail

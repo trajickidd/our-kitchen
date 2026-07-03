@@ -34,3 +34,5 @@ export const profiles = {
 }
 
 export default api
+
+export const parseIngredients = (ingredients) => api.post('/parse-ingredients', { ingredients })

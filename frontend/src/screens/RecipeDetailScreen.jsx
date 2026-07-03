@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { recipes as recipesApi } from '../api/client'
+import api from '../api/client'
 
 const ALLERGEN_CONFIG = {
   gluten: { color: 'var(--allergen-gluten)', who: 'Lauren' },
@@ -29,14 +30,17 @@ export default function RecipeDetailScreen({ showToast }) {
   const [portions, setPortions] = useState(null)
   const [macros, setMacros] = useState(null)
   const [activeTab, setActiveTab] = useState('ingredients')
-  const [adjustments, setAdjustments] = useState({}) // {ing_id: qty_override}
+  const [adjustments, setAdjustments] = useState({})
   const [recalcLoading, setRecalcLoading] = useState(false)
+  const [isFavourite, setIsFavourite] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     recipesApi.get(id).then(r => {
       setRecipe(r.data)
       setPortions(r.data.base_portions)
       setMacros(r.data.macros)
+      setIsFavourite(r.data.is_favourite || false)
       setLoading(false)
     }).catch(() => { setLoading(false) })
   }, [id])
@@ -50,6 +54,24 @@ export default function RecipeDetailScreen({ showToast }) {
       setMacros(r.data)
     } finally {
       setRecalcLoading(false)
+    }
+  }
+
+  const toggleFavourite = async () => {
+    try {
+      const r = await api.post(\`/recipes/\${id}/favourite\`)
+      setIsFavourite(r.data.is_favourite)
+    } catch (e) {}
+  }
+
+  const deleteRecipe = async () => {
+    if (!window.confirm('Delete this recipe?')) return
+    setDeleting(true)
+    try {
+      await recipesApi.delete(id)
+      navigate('/')
+    } catch (e) {
+      setDeleting(false)
     }
   }
 
@@ -108,8 +130,8 @@ export default function RecipeDetailScreen({ showToast }) {
           <i className="ti ti-arrow-left" style={{ color: '#fff', fontSize: 18 }} />
         </div>
         {/* Fav */}
-        <div style={{ position: 'absolute', top: 52, right: 16, zIndex: 10, background: 'rgba(255,255,255,0.2)', borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backdropFilter: 'blur(8px)' }}>
-          <i className="ti ti-heart" style={{ color: '#fff', fontSize: 16 }} />
+        <div onClick={toggleFavourite} style={{ position: 'absolute', top: 52, right: 16, zIndex: 10, background: 'rgba(255,255,255,0.2)', borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backdropFilter: 'blur(8px)' }}>
+          <i className={isFavourite ? 'ti ti-heart' : 'ti ti-heart'} style={{ color: isFavourite ? '#E24B4A' : '#fff', fontSize: 16 }} />
         </div>
         {/* Source badge */}
         {recipe.source_type && (
@@ -265,7 +287,21 @@ export default function RecipeDetailScreen({ showToast }) {
           </div>
         )}
 
-        {/* Source link */}
+        {/* Delete button */}
+      <div style={{ padding: '0 0 8px' }}>
+        <button onClick={deleteRecipe} disabled={deleting} style={{
+          width: '100%', padding: '12px', background: 'transparent',
+          border: '1px solid #FEECEC', borderRadius: 'var(--radius-md)',
+          color: 'var(--sugar)', fontSize: 13, fontWeight: 700,
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          fontFamily: 'Nunito, sans-serif'
+        }}>
+          <i className="ti ti-trash" style={{ fontSize: 16 }} />
+          {deleting ? 'Deleting...' : 'Delete recipe'}
+        </button>
+      </div>
+
+      {/* Source link */}
         {recipe.source_url && (
           <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', marginTop: 16, marginBottom: 20, boxShadow: 'var(--shadow-sm)' }}>
             {recipe.source_type === 'youtube' && (
