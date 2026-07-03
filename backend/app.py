@@ -842,6 +842,13 @@ def health():
 
 with app.app_context():
     db.create_all()
+    # Add missing columns to existing tables (safe migration)
+    try:
+        with db.engine.connect() as conn:
+            conn.execute(db.text('ALTER TABLE recipe ADD COLUMN is_favourite BOOLEAN DEFAULT FALSE'))
+            conn.commit()
+    except Exception:
+        pass  # Column already exists
     # Seed default profiles if none exist
     if Profile.query.count() == 0:
         db.session.add(Profile(name='Kievz', allergens=['lactose'], macro_priority=['calories', 'protein']))
